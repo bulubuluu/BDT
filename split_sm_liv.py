@@ -34,12 +34,12 @@ with uproot.open(input_file) as f:
     nc_values = tree["NC_Amplitude"].array()
 
 # ==========================
-# Event weight
+# Event weights (LIV)
 # ==========================
-liv_factor = 1.0 + nc_values / sm_values
+liv_weight = 1 + nc_values / sm_values
 
 # ==========================
-# Select Z1 and Z2 (PID=23)
+# Select Z1 and Z2 (PID=23, status=2)
 # ==========================
 is_Z = (pid == 23) & (status == 2)
 
@@ -50,8 +50,6 @@ Z_Mass   = mass[is_Z]
 Z_Pz     = pz[is_Z]
 Z_Energy = energy[is_Z]
 
-print("Z per event:", ak.num(Z_PT))
-
 mask_twoZ = (ak.num(Z_PT) == 2)
 
 Z_PT     = Z_PT[mask_twoZ]
@@ -61,60 +59,29 @@ Z_Mass   = Z_Mass[mask_twoZ]
 Z_Pz     = Z_Pz[mask_twoZ]
 Z_Energy = Z_Energy[mask_twoZ]
 
-liv_factor = liv_factor[mask_twoZ]
+liv_weight = liv_weight[mask_twoZ]
 
+# ==========================
+# Convert to NumPy arrays
+# ==========================
 z1_pt     = ak.to_numpy(Z_PT[:, 0])
 z2_pt     = ak.to_numpy(Z_PT[:, 1])
-
 z1_eta    = ak.to_numpy(Z_Eta[:, 0])
 z2_eta    = ak.to_numpy(Z_Eta[:, 1])
-
 z1_phi    = ak.to_numpy(Z_Phi[:, 0])
 z2_phi    = ak.to_numpy(Z_Phi[:, 1])
-
 z1_mass   = ak.to_numpy(Z_Mass[:, 0])
 z2_mass   = ak.to_numpy(Z_Mass[:, 1])
-
 z1_pz     = ak.to_numpy(Z_Pz[:, 0])
 z2_pz     = ak.to_numpy(Z_Pz[:, 1])
-
 z1_energy = ak.to_numpy(Z_Energy[:, 0])
 z2_energy = ak.to_numpy(Z_Energy[:, 1])
+liv_weight = ak.to_numpy(liv_weight)
 
-liv_factor = ak.to_numpy(liv_factor)
-
-print("Final events:", len(z1_pt))
-print("Weights:", len(liv_factor))
+print("Total events:", len(z1_pt))
 
 # ==========================
-# Weighted histogram function
-# ==========================
-def fill_weighted_hist(values, weights, bins=50, range=None):
-    hist, edges = np.histogram(values, bins=bins, range=range, weights=weights)
-    bin_centers = 0.5 * (edges[:-1] + edges[1:])
-    inds = np.digitize(values, edges) - 1
-    inds = np.clip(inds, 0, len(bin_centers) - 1)
-    return bin_centers[inds]
-
-# ==========================
-# Generate weighted Z variables (LIV)
-# ==========================
-z1_pt_liv     = fill_weighted_hist(z1_pt, liv_factor)
-z1_eta_liv    = fill_weighted_hist(z1_eta, liv_factor)
-z1_phi_liv    = fill_weighted_hist(z1_phi, liv_factor)
-z1_mass_liv   = fill_weighted_hist(z1_mass, liv_factor)
-z1_pz_liv     = fill_weighted_hist(z1_pz, liv_factor)
-z1_energy_liv = fill_weighted_hist(z1_energy, liv_factor)
-
-z2_pt_liv     = fill_weighted_hist(z2_pt, liv_factor)
-z2_eta_liv    = fill_weighted_hist(z2_eta, liv_factor)
-z2_phi_liv    = fill_weighted_hist(z2_phi, liv_factor)
-z2_mass_liv   = fill_weighted_hist(z2_mass, liv_factor)
-z2_pz_liv     = fill_weighted_hist(z2_pz, liv_factor)
-z2_energy_liv = fill_weighted_hist(z2_energy, liv_factor)
-
-# ==========================
-# Save SM ROOT
+# Save SM ROOT (all events, weight=1)
 # ==========================
 with uproot.recreate(output_file_sm) as f:
     f["LHEF"] = {
@@ -130,50 +97,57 @@ with uproot.recreate(output_file_sm) as f:
         "Z2_Mass": z2_mass.astype(np.float32),
         "Z2_Pz": z2_pz.astype(np.float32),
         "Z2_Energy": z2_energy.astype(np.float32),
+        "Weight": np.ones_like(z1_pt, dtype=np.float32)
     }
 
 # ==========================
-# Save LIV ROOT
+# Save LIV ROOT (only positive weights)
 # ==========================
+mask_pos = liv_weight > 0
+print("Positive-weight LIV events:", mask_pos.sum())
+
 with uproot.recreate(output_file_liv) as f:
     f["LHEF"] = {
-        "Z1_PT": z1_pt_liv.astype(np.float32),
-        "Z1_Eta": z1_eta_liv.astype(np.float32),
-        "Z1_Phi": z1_phi_liv.astype(np.float32),
-        "Z1_Mass": z1_mass_liv.astype(np.float32),
-        "Z1_Pz": z1_pz_liv.astype(np.float32),
-        "Z1_Energy": z1_energy_liv.astype(np.float32),
-        "Z2_PT": z2_pt_liv.astype(np.float32),
-        "Z2_Eta": z2_eta_liv.astype(np.float32),
-        "Z2_Phi": z2_phi_liv.astype(np.float32),
-        "Z2_Mass": z2_mass_liv.astype(np.float32),
-        "Z2_Pz": z2_pz_liv.astype(np.float32),
-        "Z2_Energy": z2_energy_liv.astype(np.float32),
+        "Z1_PT": z1_pt[mask_pos].astype(np.float32),
+        "Z1_Eta": z1_eta[mask_pos].astype(np.float32),
+        "Z1_Phi": z1_phi[mask_pos].astype(np.float32),
+        "Z1_Mass": z1_mass[mask_pos].astype(np.float32),
+        "Z1_Pz": z1_pz[mask_pos].astype(np.float32),
+        "Z1_Energy": z1_energy[mask_pos].astype(np.float32),
+        "Z2_PT": z2_pt[mask_pos].astype(np.float32),
+        "Z2_Eta": z2_eta[mask_pos].astype(np.float32),
+        "Z2_Phi": z2_phi[mask_pos].astype(np.float32),
+        "Z2_Mass": z2_mass[mask_pos].astype(np.float32),
+        "Z2_Pz": z2_pz[mask_pos].astype(np.float32),
+        "Z2_Energy": z2_energy[mask_pos].astype(np.float32),
+        "Weight": liv_weight[mask_pos].astype(np.float32)
     }
 
 # ==========================
-# Plot comparison
+# Plot SM vs LIV using weights
 # ==========================
 plt.figure(figsize=(15,10))
-
-vars_sm = [z1_pt, z1_eta, z1_phi, z1_mass, z1_pz, z1_energy,
-           z2_pt, z2_eta, z2_phi, z2_mass, z2_pz, z2_energy]
-
-vars_liv = [z1_pt_liv, z1_eta_liv, z1_phi_liv, z1_mass_liv, z1_pz_liv, z1_energy_liv,
-            z2_pt_liv, z2_eta_liv, z2_phi_liv, z2_mass_liv, z2_pz_liv, z2_energy_liv]
-
 var_names = ["Z1_PT","Z1_Eta","Z1_Phi","Z1_Mass","Z1_Pz","Z1_Energy",
              "Z2_PT","Z2_Eta","Z2_Phi","Z2_Mass","Z2_Pz","Z2_Energy"]
 
-for i, (v_sm, v_liv) in enumerate(zip(vars_sm, vars_liv)):
+vars_values_sm = [z1_pt, z1_eta, z1_phi, z1_mass, z1_pz, z1_energy,
+                  z2_pt, z2_eta, z2_phi, z2_mass, z2_pz, z2_energy]
+
+vars_values_liv = [z1_pt[mask_pos], z1_eta[mask_pos], z1_phi[mask_pos], z1_mass[mask_pos],
+                   z1_pz[mask_pos], z1_energy[mask_pos],
+                   z2_pt[mask_pos], z2_eta[mask_pos], z2_phi[mask_pos], z2_mass[mask_pos],
+                   z2_pz[mask_pos], z2_energy[mask_pos]]
+
+for i, (v_sm, v_liv) in enumerate(zip(vars_values_sm, vars_values_liv)):
     plt.subplot(4,3,i+1)
     plt.hist(v_sm, bins=50, histtype='step', label='SM')
-    plt.hist(v_liv, bins=50, histtype='step', label='LIV')
+    plt.hist(v_liv, bins=50, weights=liv_weight[mask_pos], histtype='step', label='LIV')
     plt.xlabel(var_names[i])
     plt.ylabel("Counts")
     plt.legend()
 
 plt.tight_layout()
 plt.savefig("plots/SM_vs_LIV_Z_variables.png", dpi=150)
+plt.show()
 
-print("Done. Output ROOT files and plots created.")
+print("Done. SM kept all events, LIV negative weights removed, ROOT files and plots created.")
