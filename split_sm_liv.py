@@ -3,9 +3,9 @@ import awkward as ak
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+import ROOT 
 
 def reconstruct_Z_from_leptons(pt, eta, phi, mass, pid, pid1, pid2):
-
     mask1 = (pid == pid1)
     mask2 = (pid == pid2)
 
@@ -15,31 +15,15 @@ def reconstruct_Z_from_leptons(pt, eta, phi, mass, pid, pid1, pid2):
     pt1, eta1, phi1, m1 = pt[mask1][0], eta[mask1][0], phi[mask1][0], mass[mask1][0]
     pt2, eta2, phi2, m2 = pt[mask2][0], eta[mask2][0], phi[mask2][0], mass[mask2][0]
 
-    px1 = pt1*np.cos(phi1)
-    py1 = pt1*np.sin(phi1)
-    pz1 = pt1*np.sinh(eta1)
+    lv1 = ROOT.TLorentzVector()
+    lv2 = ROOT.TLorentzVector()
+    lv1.SetPtEtaPhiM(pt1, eta1, phi1, m1)
+    lv2.SetPtEtaPhiM(pt2, eta2, phi2, m2)
 
-    px2 = pt2*np.cos(phi2)
-    py2 = pt2*np.sin(phi2)
-    pz2 = pt2*np.sinh(eta2)
+    Z = lv1 + lv2
 
-    E1 = np.sqrt(px1**2+py1**2+pz1**2+m1**2)
-    E2 = np.sqrt(px2**2+py2**2+pz2**2+m2**2)
+    return Z.Pt(), Z.Eta(), Z.Phi(), Z.M(), Z.Pz(), Z.E()
 
-    px = px1 + px2
-    py = py1 + py2
-    pz = pz1 + pz2
-    E  = E1  + E2
-
-    pt  = np.sqrt(px**2+py**2)
-    phi = np.arctan2(py,px)
-
-    p = np.sqrt(px**2+py**2+pz**2)
-    eta = 0.5*np.log((p+pz)/(p-pz))
-
-    mass = np.sqrt(E**2-(px**2+py**2+pz**2))
-
-    return pt, eta, phi, mass, pz, E
 
 if __name__ == '__main__':
     # ==========================
