@@ -3,7 +3,9 @@ import awkward as ak
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-import ROOT 
+import ROOT
+import matplotlib
+matplotlib.use("Agg")
 
 def reconstruct_Z_from_leptons(pt, eta, phi, mass, pid, pid1, pid2):
     mask1 = (pid == pid1)
@@ -29,7 +31,8 @@ if __name__ == '__main__':
     # ==========================
     # File paths
     # ==========================
-    input_file = "/eos/user/z/zhilang/livnczz4l/MG_LHE_ppZZto4L_LO_theta_1e-4/result/update_MG_325300_1e-4_weighted_events.root"
+    # input_file = "/eos/user/z/zhilang/livnczz4l/MG_LHE_ppZZto4L_LO_theta_1e-4/result/update_MG_325300_1e-4_weighted_events.root"
+    input_file = "/eos/user/y/yzhang4/LIV/LO/MG_LHE_ppZZto4L_LO_theta_1e-5/result/total.root"
     output_file_sm  = "SM_LHEF.root"
     output_file_liv = "LIV_LHEF.root"
     tree_name = "LHEF"
@@ -173,12 +176,37 @@ if __name__ == '__main__':
                     z1_pz[mask_pos], z1_energy[mask_pos],
                     z2_pt[mask_pos], z2_eta[mask_pos], z2_phi[mask_pos], z2_mass[mask_pos],
                     z2_pz[mask_pos], z2_energy[mask_pos]]
+    for i in range(6):
+        
+        v1_sm = vars_values_sm[i]
+        v1_liv = vars_values_liv[i]
 
-    for i, (v_sm, v_liv) in enumerate(zip(vars_values_sm, vars_values_liv)):
+        v2_sm = vars_values_sm[i+6]
+        v2_liv = vars_values_liv[i+6]
+        hist_range = (
+          min(v1_sm.min(), v1_liv.min(), v2_sm.min(), v2_liv.min()),
+          max(v1_sm.max(), v1_liv.max(), v2_sm.max(), v2_liv.max())
+        )
+
+        # ===== Z1 =====
         plt.subplot(4,3,i+1)
-        plt.hist(v_sm, bins=50, histtype='step', label='SM')
-        plt.hist(v_liv, bins=50, weights=liv_weight[mask_pos], histtype='step', label='LIV')
+
+        plt.hist(v1_sm, bins=50, range=hist_range, histtype='step', label='SM')
+        plt.hist(v1_liv, bins=50, range=hist_range,
+                 weights=liv_weight[mask_pos], histtype='step', label='LIV')
+
         plt.xlabel(var_names[i])
+        plt.ylabel("Counts")
+        plt.legend()
+        
+        # ===== Z2 =====
+        plt.subplot(4,3,i+7)
+
+        plt.hist(v2_sm, bins=50, range=hist_range, histtype='step', label='SM')
+        plt.hist(v2_liv, bins=50, range=hist_range,
+                 weights=liv_weight[mask_pos], histtype='step', label='LIV')
+
+        plt.xlabel(var_names[i+6])
         plt.ylabel("Counts")
         plt.legend()
 
